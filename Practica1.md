@@ -26,9 +26,9 @@ SHU immediate;
 Creamos la ruta a la cual copiaremos las configuraciones: 
 
 ```CMD
-MKDIR /home/oracle/fullBackup
-CD u01/app/oracle/oradata/ORCL18
-CP -R * /home/oracle/fullBackup
+mkdir /home/oracle/fullBackup
+cd u01/app/oracle/oradata/ORCL18
+cp -R * /home/oracle/fullBackup
 ```
 
 ### 3. Se debe habilitar el ArchiveLog Mode
@@ -56,19 +56,50 @@ Verificamos el estado de block change tracking y visualizamos la ubicacion actua
 
 ```rman
 SELECT status,filename FROM V$BLOCK_CHANGE_TRACKING;
-SELECT name FROM V$DATAFIJE;
+SELECT name FROM V$DATAFILE;
 ALTER SYSTEM SET DB_CREATE_FILE_DEST = '/uo1/app/oracle/oradata';
 ALTER DATABASE ENABLE BLOCK CHANGE TRACKING;
 ```
 
 ### 6. Posteriormente se debe crear los scripts necesarios para configurar los Backups incrementales diarios. Estos deben ser configurados por medio de Cronjobs o Scheduler Jobs, los cuales se deben ejecutar todos los días a las 2 de la mañana. Para la calificación se deben tener mínimo backups incrementales de los últimos 2 días
 
-```SQL
-RUN{
-    RECOVER COPY OF DATABASE WITH TAG 'incr_update';
-    BACKUP INCREMENTAL LEVEL 1 FOR RECOVER OF COPY WITH TAG 'incr_update'
-    DATABASE;
+Se creo un script-sh para ejecutar 
+
+```sh
+#!/bin/bash
+export ORACLE_BASE=/u01/app/oracle
+export ORACLE_HOME=/u01/app/oracle/product/18.0.0/dbhome_1
+export ORACLE_SID=ORCL18 >> /home/oracle/.bashrc
+export ORACLE_BASE=/u01/app/oracle >> /home/oracle/.bashrc
+export ORACLE_HOME=/u01/app/oracle/product/18.0.0/dbhome_1 >> /home/oracle/.bashrc
+export PATH=$ORACLE_HOME/bin:$PATH >> /home/oracle/.bashrc
+
+
+/u01/app/oracle/product/18.0.0/dbhome_1/bin/rman target sipues/1234 nocatalog  @/home/oracle/inc_back.rmn  
+```
+
+El archivo inc_back.rmn contiene lo siguiente:
+```rman
+run {
+backup incremental level 1 database;
 }
+```
+Se creo el JOB:
+```SQL
+begin
+dbms_scheduler.create_job(
+job_name => 'inmediate',
+job_type   => 'EXTERNAL_SCRIPT',
+job_action => '/u01/scriptrman.sh',
+start_date => SYSTIMESTAMP,
+repeat_interval => 'FREQ=DAILY;BYHOUR=2;',
+enabled => true,
+auto_drop => false,
+      credential_name => 'oracle',
+      destination_name => NULL,
+comments => 'backup schedule');
+end;
+/
 ```
 
 ### 7. Se debe realizar la configuración para que la retención del UNDO tablespace sea de 3 horas
