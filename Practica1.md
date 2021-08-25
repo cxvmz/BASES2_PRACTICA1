@@ -1,5 +1,11 @@
 # Practica 1 Bases de datos2
 
+## Integrantes
+
+- Kevin Estuardo Cardona Lopez 201800596
+- Angel Manuel Miranda Asturias 201807394
+- Christian Estuardo Mazariegos Rizo 201800580
+
 Al momento de instalar la maquina virtual en google cloud se hizo una instalacion de docker para el manejo de Oracle 18C.
 
 ### 1. Habilitar FRA
@@ -229,3 +235,26 @@ FLASHBACK TABLE Clientes TO BEFORE DROP;
 ```
 
 ### 11.Investigar y colocar en el manual los cálculos necesarios para obtener los tamaños del FRA
+
+x = número de días entre incrementales
+y = retraso de aplicación de ARCHIVELOG en BD de Standby lógica (si aplica)
+
+Tamaño FRA =
+Tamaño de la copia de la base de datos +
+Tamaño de una copia de seguridad incremental +
+Tamaño de (x + 1) días de registros de archived redo logs +
+Tamaño de (y + 1) días de registros de foreign archived redo logs+
+Tamaño de control file +
+Tamaño de un online redo log member * número de log grups +
+Tamaño de flashback logs
+
+Ejemplo
+
+Tamaño FRA =
+3.2GB COPY OF DB +
+0.2GB INC BACKUP (EST) +
+0.2GB ARCHIVELOG (EST) +
+0.1GB CONTROLFILE +
+0.5GB REDOLOGS +
+0.5GB FLASHBACK LOGS
+= 4.7GB TOTAL
