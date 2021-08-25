@@ -4,9 +4,8 @@ Al momento de instalar la maquina virtual en google cloud se hizo una instalacio
 
 ### 1. Habilitar FRA
 
-
 ```sql
-MKDIR /home/oracle/db2_grupo7
+mkdir /home/oracle/bd2_grupo7
 show parameter db_recovery_file;
 alter system set db_recovery_file_dest_size=15G scope=both SID='*';
 ALTER SYSTEM SET db_recovery_file_dest = '/home/oracle/bd2_grupo7' SCOPE=BOTH SID='*';
@@ -122,13 +121,111 @@ ALTER SYSTEM SET DB_FLASHBACK_RETENTION_TARGET=120;
 ALTER DATABASE FLASHBACK ON;
 ```
 
-### 9. Se deberá crear la siguiente tabla:
+### 9. Se deberá crear la siguiente tabla e insertar el csv
+
+Se crearon las siguientes tablas:
 
 ```SQL
 CREATE TABLE Clientes(
-   id_cliente INT NOT NULL PRIMARY KEY,
-   nombre_cliente CHAR(50) NOT NULL,
-   apellido_cliente CHAR(50) NOT NULL,
-   edad_cliente INT NOT NULL,
-   direccion_cliente CHAR(50) NULL);
+   id_cliente VARCHAR(100) NOT NULL PRIMARY KEY,
+   nombre_cliente VARCHAR(100) NOT NULL,
+   apellido_cliente VARCHAR(100) NOT NULL,
+   edad_cliente VARCHAR(100) NOT NULL,
+   direccion_cliente VARCHAR(100) NULL);
 ```
+
+```SQL
+CREATE TABLE logErrores(
+   tipo_error CHAR(50) NOT NULL,
+   fecha TIMESTAMP NOT NULL,
+   linea INT NOT NULL);
+```
+
+Se crearon los siguientes procedimientos almacenados:
+
+- Insersion de errores:
+
+```SQL
+CREATE OR REPLACE PROCEDURE insert_error(
+   tipo_error in CHAR,
+   linea in NUMBER
+)
+   as
+   begin
+    insert into logErrores values (tipo_error, TO_TIMESTAMP_TZ(CURRENT_TIMESTAMP, 'DD-MON-RR HH.MI.SSXFF PM TZH:TZM'), linea);
+end;
+/
+```
+
+- Insersion de datos: 
+
+```SQL
+CREATE OR REPLACE PROCEDURE INSERT_DATA
+IS
+    v_file UTL_FILE.FILE_TYPE;
+    v_string VARCHAR2(23767);
+    v_line NUMBER := 1;
+    /*
+        PARA LA TABLA
+    */
+    t_id VARCHAR2(100);
+    t_nombre VARCHAR2(100);
+    t_apellido VARCHAR2(100);
+    t_edad VARCHAR2(100);
+    t_direccion VARCHAR2(100);
+BEGIN
+    v_file := UTL_FILE.FOPEN('RUTA_CSV', 'Practica1_Datos.csv', 'r');
+    LOOP
+        BEGIN
+            UTL_FILE.GET_LINE(v_file, v_string);
+            t_id := regexp_substr(v_string, '[^,]+', 1, 1);
+            t_nombre := regexp_substr(v_string, '[^,]+', 1, 2);
+            t_apellido := regexp_substr(v_string, '[^,]+', 1,3);
+            t_edad := regexp_substr(v_string, '[^,]+', 1, 4);
+            t_direccion := regexp_substr(v_string, '[^,]+', 1, 5);
+
+            insert into clientes values (t_id,t_nombre,t_apellido,t_edad,t_direccion);
+            v_line := v_line +  1;
+            EXCEPTION
+            WHEN DUP_VAL_ON_INDEX THEN
+                insert_error('Llave Repetida', v_line);
+                CONTINUE;
+        END;
+    END LOOP;
+    UTL_FILE.FCLOSE(v_file);
+EXCEPTION
+    WHEN no_data_found THEN
+        UTL_FILE.FCLOSE(v_file);
+END;
+/
+```
+
+Se simulo un errror actualizando todos los nombres a un valor especifico y para recuperar los valores inciales se aplico lo siguiente:
+
+- Error:
+
+```SQL
+UPDATE Clientes SET nombre_cliente='Bases de Datos 2';
+```
+
+- Solucion:
+
+```SQL
+FLASHBACK TABLE Clientes TO TIMESTAMP (SYSTIMESTAMP - INTERVAL '1' minute);
+```
+
+### 10.Se eliminará la tabla “Clientes” usada en el punto anterior. Posteriormente se hará uso de FLASHBACK TABLE para recuperar la tabla eliminada
+
+- Eliminacion:
+
+```SQL
+DROP TABLE Clientes;
+```
+
+- Solucion:
+
+```SQL
+FLASHBACK TABLE Clientes TO BEFORE DROP;
+```
+
+### 11.Investigar y colocar en el manual los cálculos necesarios para obtener los tamaños del FRA
